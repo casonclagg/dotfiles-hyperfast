@@ -1,0 +1,428 @@
+#!/usr/bin/env bash
+# vim: filetype=sh
+#
+# Install my dev environment including vim, dotfiles, go, node, and ui stuff
+
+TMP_FILE_PREFIX=${TMPDIR:-/tmp}/prog.$$
+GOLANG_VERSION="1.14"
+PYTHON_VERSION="3.8.3"
+
+DEFAULT_APT_PACKAGES="
+apt-utils
+build-essential
+curl
+playerctl
+fonts-font-awesome
+fonts-powerline
+git
+jq
+wget
+vim
+"
+
+DEFAULT_VIM_PLUGINS="
+tpope/vim-fugitive
+tpope/vim-unimpaired
+tpope/vim-surround
+scrooloose/nerdtree
+scrooloose/nerdcommenter
+kien/ctrlp.vim
+rking/ag.vim
+majutsushi/tagbar
+milkypostman/vim-togglelist
+vim-airline/vim-airline
+vim-airline/vim-airline-themes
+elzr/vim-json
+digitaltoad/vim-jade
+fatih/vim-go
+vim-ruby/vim-ruby
+elixir-lang/vim-elixir
+avakhov/vim-yaml
+shime/vim-livedown
+leafgarland/typescript-vim
+editorconfig/editorconfig-vim
+"
+
+function usage() {
+  echo "Usage: init [OPTION]
+  -f          full (install everything)
+  -m          minimal install (just vim)
+  "
+}
+
+# TODO - Test this
+function install_random() {
+  pip install --upgrade pip
+  sudo apt install -y exfat-utils exfat-fuse
+  
+  # Not sure I need to do this....
+  sudo apt remove -y --purge alsa-base alsa-utils pulseaudio indicator-sound
+  sudo apt install -y alsa-base alsa-utils pulseaudio indicator-sound
+  sudo alsa force-reload
+
+  sudo apt install -y audacity
+  sudo apt install -y openscad
+  sudo apt install -y numlockx
+
+  # Install VLC & ImageMagick
+  sudo apt install -y imagemagick vlc
+  
+  # networking
+  sudo apt install -y netcat
+
+  # Install powerline
+  pip install powerline-shell
+  
+  # Install youtube downloader
+  # pip install youtube-dl
+  sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+  sudo chmod a+rx /usr/local/bin/yt-dlp
+  
+  # Install nonsense
+  sudo apt install -y ruby
+  sudo gem install lolcat
+  sudo apt install -y figlet cowsay fortune
+  figlet noice! | lolcat
+
+  # make nautilus not stupid
+  sudo apt remove -y nautilus-share
+  sudo apt install -y nautilus-share
+  mkdir -p /var/lib/samba/usershares
+
+  # install OBS
+  sudo apt install -y ffmpeg 
+  sudo add-apt-repository ppa:obsproject/obs-studio
+  sudo apt update
+  sudo apt install -y obs-studio
+
+  # Firewall
+  sudo ufw enable
+  sudo ufw status
+
+  # Other things
+  sudo apt install -y net-tools rhash gimp keepass2 nginx
+
+  echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
+
+  sudo apt install -y --reinstall ttf-mscorefonts-installer
+
+  # install gh
+  # curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+  # echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+  # sudo apt update
+  # sudo apt install gh
+
+  # sudo apt install -y fluidsynth
+  sudo apt install -y git-lfs
+  sudo apt install -y ncdu
+  # sudo apt install -y google-chrome-stable
+
+}
+
+function install_apt_packages() {
+  for apt_pkg in $@; do
+    if ! $(dpkg -s $apt_pkg &> /dev/null); then
+      sudo DEBIAN_FRONTEND=noninteractive apt install -qq -y $apt_pkg
+    fi
+  done
+}
+
+function install_vim_plugins() {
+  mkdir -p ~/.vim/autoload ~/.vim/bundle
+  # make sure we have pathogen
+  if [ ! -e ~/.vim/autoload/pathogen.vim ]; then
+    curl -LSso ~/.vim/autoload/pathogen.vim https://tpo.pe/pathogen.vim
+  fi
+
+  # install all the plugins
+  for plugin in $@; do
+    local plugin_name="${plugin##*/}"
+
+    if [ ! -d $HOME/.vim/bundle/$plugin_name ]; then
+      git clone --depth=1 "https://github.com/$plugin" "$HOME/.vim/bundle/$plugin_name"
+    fi
+  done
+}
+
+function _has() {
+  if $(type -t "$1" &> /dev/null); then 
+    return 0 
+  fi 
+  return 1
+}
+
+function install_node() {
+  if [ -f $HOME/.nvm/nvm.sh ]; then
+    source $HOME/.nvm/nvm.sh
+  else
+    # Install the latest version of NVM
+    LATEST_NVM=$(curl -sL https://api.github.com/repos/creationix/nvm/releases/latest | jq -r '.tag_name')
+    curl -LSs https://raw.githubusercontent.com/creationix/nvm/$LATEST_NVM/install.sh | bash
+    
+    # Add NVM to bash_local so it'll work in the shell
+    # COMMENTED OUT: Because this is already in my bashrc...
+    # echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bash_local
+    # echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bash_local
+    
+    # load NVM so we can use it to install node
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  fi
+
+  if _has nvm && ! _has node; then
+    nvm install --lts
+  fi
+
+  if _has npm && ! _has yarn; then
+    npm install -g yarn
+  fi
+}
+
+
+
+function install_golang() {
+  if [ ! -d "$HOME/.go" ] && [ ! -d "$HOME/go" ]; then
+    wget -q "https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-amd64.tar.gz" -O /tmp/go.tar.gz
+    tar -C "$HOME" -xzf /tmp/go.tar.gz
+    mv "$HOME/go" "$HOME/.go"
+    {
+      echo '# GoLang'
+      echo 'export GOROOT=$HOME/.go'
+      echo 'export PATH=$PATH:$GOROOT/bin'
+      echo 'export GOPATH=$HOME/go'
+      echo 'export PATH=$PATH:$GOPATH/bin'
+    } >> "$HOME/.bash_local"
+    mkdir -p $HOME/go/{src,pkg,bin}
+    rm -f /tmp/go.tar.gz
+  fi
+
+  if _has go && ! _has drive; then
+    go get -u github.com/odeke-em/drive/cmd/drive
+  fi
+}
+
+function install_python() {
+  if ! _has pyenv; then
+    # Install python deps
+    install_apt_packages "make build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python-openssl git"
+
+    curl -LSs https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
+    {
+      echo 'export PATH="$HOME/.pyenv/bin:$PATH"'
+      echo 'eval "$(pyenv init -)"'
+      echo 'eval "$(pyenv virtualenv-init -)"'
+    } >> "$HOME/.bash_local"
+
+    export PATH="$HOME/.pyenv/bin:$PATH"
+    eval "$(pyenv init -)"
+    eval "$(pyenv virtualenv-init -)"
+
+    pyenv install ${PYTHON_VERSION} && pyenv global ${PYTHON_VERSION}
+  fi
+
+  if _has pip && ! _has http; then
+    pip install httpie httpie-jwt-auth
+  fi
+}
+
+function install_ctags() {
+  if ! _has ctags; then
+    git clone -q --depth=1 https://github.com/universal-ctags/ctags.git /tmp/ctags
+    install_apt_packages autotools-dev autoconf pkg-config
+    cd /tmp/ctags
+    ./autogen.sh
+    ./configure
+    make
+    sudo make install
+    cd -
+    rm -rf /tmp/ctags
+  fi
+
+  install_vim_plugins "ludovicchabant/vim-gutentags.git"
+}
+
+function install_dotfiles() {
+  if [ ! -d "$HOME/.homesick/repos/homeshick" ]; then 
+    git clone --depth=1 https://github.com/andsens/homeshick.git $HOME/.homesick/repos/homeshick
+    echo 'source $HOME/.homesick/repos/homeshick/homeshick.sh' >> ~/.bash_local
+    source $HOME/.homesick/repos/homeshick/homeshick.sh
+    yes | homeshick clone -b casonclagg/dotfiles-alien
+    yes | homeshick link dotfiles-alien
+  fi
+}
+
+function install_uiapps() {
+  install_apt_packages "i3 pavucontrol scrot xclip vim-gnome fonts-powerline"
+
+  # For the nvidia 3080, we need 470
+  if [[ $(ubuntu-drivers devices | grep -q nvidia-driver) -eq 0 ]]; then
+    if [[ $(dpkg -s nvidia-driver-470 &> /dev/null) -ne 0 ]]; then
+      # sudo add-apt-repository -y ppa:graphics-drivers/ppa
+      # sudo apt update
+      # sudo apt install -y nvidia-driver-470
+      sudo apt-get remove --purge '^nvidia-.*'
+      echo 'nouveau' | sudo tee -a /etc/modules
+      sudo ubuntu-drivers install
+    fi
+  fi
+
+  # google chrome
+  if ! _has google-chrome; then
+    # TODO I think theres a snap
+    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+    echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' | sudo tee /etc/apt/sources.list.d/google-chrome.list
+    sudo apt update
+    sudo apt install -y google-chrome-stable
+    echo "BROWSER=$(which google-chrome)" >> ~/.bash_local
+  fi
+
+  # slack
+  if ! _has slack; then
+    sudo snap install slack --classic
+  fi
+
+  # spotify
+  if ! _has spotify; then
+    sudo snap install spotify
+  fi
+}
+
+function install_vscode() {
+  if ! _has code; then
+    # set up the microsoft repo
+    curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
+    sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
+    sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
+
+    # install code
+    sudo apt update
+    sudo apt install -y code
+
+    # install all the extensions
+    VSCODE_EXTENSIONS="
+    dbaeumer.vscode-eslint
+    eamodio.gitlens
+    ms-python.python
+    ms-vscode.wordcount
+    christian-kohler.path-intellisense
+    EditorConfig.EditorConfig
+    mikestead.dotenv
+    "
+    for ext in $VSCODE_EXTENSIONS; do
+      code --install-extension $ext
+    done
+  fi
+}
+
+function install_docker() {
+  echo "NOT INSTALLING DOCKER"
+  # if ! _has docker; then
+  #   sudo apt install -y docker.io
+
+  #   distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+  #   curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+  #   curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+
+  #   sudo apt update && sudo apt install -y nvidia-container-toolkit
+  #   sudo systemctl restart docker
+
+  #   # Setup docker group - https://docs.docker.com/engine/install/linux-postinstall/
+  #   sudo groupadd docker
+  #   sudo usermod -aG docker $USER
+  #   # su ${USER}
+  #   sudo systemctl restart docker
+
+  #   # install nvidia-docker2
+  #   distribution=ubuntu18.04 && \
+  #   curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -    && \ 
+  #   curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+  #   sudo apt-get update
+  #   sudo apt-get install -y nvidia-docker2
+  #   sudo systemctl restart docker
+    
+  #   sudo apt install -y nvidia-utils-470 nvidia-cuda-toolkit
+  # fi
+}
+
+function install_devtools() {
+  # grab httpie if we didnt install python
+  if [[ ! $PACKAGES = *"python"* ]]; then
+    install_apt_packages "httpie"
+  fi
+
+  # gcloud cli
+  if ! _has gcloud; then
+    export CLOUD_SDK_REPO="cloud-sdk-${DISTRIB_CODENAME}"
+    source /etc/lsb-release
+    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+    sudo apt install -y apt-transport-https ca-certificates gnupg
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+    sudo apt update && sudo apt install -y google-cloud-sdk
+  fi
+
+  # kubectl cli
+  if ! _has kubectl; then
+    curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    chmod +x ./kubectl
+    sudo mv ./kubectl /usr/local/bin/kubectl
+
+    # kubectl shell autocompletion
+    echo "source <(kubectl completion bash)" >> ~/.bash_local
+    # the k alias
+    echo "alias k='kubectl'" >> ~/.bash_local
+  fi
+}
+
+
+function main() {
+  PACKAGES="node python dotfiles devtools"
+  local -r OPTS=':hfm'
+  while builtin getopts ${OPTS} opt "${@}"; do
+
+    case $opt in
+      h) usage ; exit 0
+        ;;
+
+      f) # 
+        PACKAGES="${PACKAGES} uiapps docker vscode random"
+        ;;
+
+      m) # minimal
+        PACKAGES=""
+        ;;
+
+
+      \?)
+        echo ${opt} ${OPTIND} 'is an invalid option' >&2;
+        usage;
+        exit ${INVALID_OPTION}
+        ;;
+    esac
+  done
+
+  # update apt packages
+  sudo apt update -q
+
+  # upgrade everything (no balls)
+  sudo apt upgrade -y
+
+  install_apt_packages "${DEFAULT_APT_PACKAGES}"
+
+  for pkg in ${PACKAGES}; do
+    if _has "install_$pkg"; then
+      install_$pkg
+    fi
+  done
+
+  install_vim_plugins "${DEFAULT_VIM_PLUGINS}"
+
+  exit 0
+}
+
+
+main "$@"
+
+echo "---------------------------------------------------"
+echo "All finished. You'll want to source your bashrc."
+echo "$ source ~/.bashrc"
+
