@@ -4,8 +4,7 @@
 # Install my dev environment including vim, dotfiles, go, node, and ui stuff
 
 TMP_FILE_PREFIX=${TMPDIR:-/tmp}/prog.$$
-GOLANG_VERSION="1.14"
-PYTHON_VERSION="3.8.3"
+PYTHON_VERSION="3.10.13"
 
 DEFAULT_APT_PACKAGES="
 apt-utils
@@ -18,29 +17,6 @@ git
 jq
 wget
 vim
-"
-
-DEFAULT_VIM_PLUGINS="
-tpope/vim-fugitive
-tpope/vim-unimpaired
-tpope/vim-surround
-scrooloose/nerdtree
-scrooloose/nerdcommenter
-kien/ctrlp.vim
-rking/ag.vim
-majutsushi/tagbar
-milkypostman/vim-togglelist
-vim-airline/vim-airline
-vim-airline/vim-airline-themes
-elzr/vim-json
-digitaltoad/vim-jade
-fatih/vim-go
-vim-ruby/vim-ruby
-elixir-lang/vim-elixir
-avakhov/vim-yaml
-shime/vim-livedown
-leafgarland/typescript-vim
-editorconfig/editorconfig-vim
 "
 
 function usage() {
@@ -104,7 +80,8 @@ function install_random() {
 
   echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
 
-  sudo apt install -y --reinstall ttf-mscorefonts-installer
+  # This causes a user interaction
+  # sudo apt install -y --reinstall ttf-mscorefonts-installer
 
   # install gh
   # curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -117,29 +94,28 @@ function install_random() {
   sudo apt install -y ncdu
   # sudo apt install -y google-chrome-stable
 
+  # Actually Random
+  sudo apt install -y kdenlive
+  sudo apt install -y shotwell
+  sudo apt install -y xdotool
+  sudo apt install -y websocat
+  sudo apt install -y remmina
+  sudo apt install -y barrier
+  sudo apt install -y hdparm
+  sudo apt install -y xclip xbindkeys
+  sudo apt install -y nvtop
+  sudo apt install -y texlive
+  sudo apt install -y texlive-latex-extra
+  sudo apt install -y img2pdf
+  sudo apt install -y chromium-codecs-ffmpeg-extra
+  sudo apt install -y libjpeg-dev zlib1g-dev
+
 }
 
 function install_apt_packages() {
   for apt_pkg in $@; do
     if ! $(dpkg -s $apt_pkg &> /dev/null); then
       sudo DEBIAN_FRONTEND=noninteractive apt install -qq -y $apt_pkg
-    fi
-  done
-}
-
-function install_vim_plugins() {
-  mkdir -p ~/.vim/autoload ~/.vim/bundle
-  # make sure we have pathogen
-  if [ ! -e ~/.vim/autoload/pathogen.vim ]; then
-    curl -LSso ~/.vim/autoload/pathogen.vim https://tpo.pe/pathogen.vim
-  fi
-
-  # install all the plugins
-  for plugin in $@; do
-    local plugin_name="${plugin##*/}"
-
-    if [ ! -d $HOME/.vim/bundle/$plugin_name ]; then
-      git clone --depth=1 "https://github.com/$plugin" "$HOME/.vim/bundle/$plugin_name"
     fi
   done
 }
@@ -179,28 +155,6 @@ function install_node() {
 }
 
 
-
-function install_golang() {
-  if [ ! -d "$HOME/.go" ] && [ ! -d "$HOME/go" ]; then
-    wget -q "https://storage.googleapis.com/golang/go${GOLANG_VERSION}.linux-amd64.tar.gz" -O /tmp/go.tar.gz
-    tar -C "$HOME" -xzf /tmp/go.tar.gz
-    mv "$HOME/go" "$HOME/.go"
-    {
-      echo '# GoLang'
-      echo 'export GOROOT=$HOME/.go'
-      echo 'export PATH=$PATH:$GOROOT/bin'
-      echo 'export GOPATH=$HOME/go'
-      echo 'export PATH=$PATH:$GOPATH/bin'
-    } >> "$HOME/.bash_local"
-    mkdir -p $HOME/go/{src,pkg,bin}
-    rm -f /tmp/go.tar.gz
-  fi
-
-  if _has go && ! _has drive; then
-    go get -u github.com/odeke-em/drive/cmd/drive
-  fi
-}
-
 function install_python() {
   if ! _has pyenv; then
     # Install python deps
@@ -225,46 +179,45 @@ function install_python() {
   fi
 }
 
-function install_ctags() {
-  if ! _has ctags; then
-    git clone -q --depth=1 https://github.com/universal-ctags/ctags.git /tmp/ctags
-    install_apt_packages autotools-dev autoconf pkg-config
-    cd /tmp/ctags
-    ./autogen.sh
-    ./configure
-    make
-    sudo make install
-    cd -
-    rm -rf /tmp/ctags
-  fi
-
-  install_vim_plugins "ludovicchabant/vim-gutentags.git"
-}
-
 function install_dotfiles() {
   if [ ! -d "$HOME/.homesick/repos/homeshick" ]; then 
     git clone --depth=1 https://github.com/andsens/homeshick.git $HOME/.homesick/repos/homeshick
     echo 'source $HOME/.homesick/repos/homeshick/homeshick.sh' >> ~/.bash_local
     source $HOME/.homesick/repos/homeshick/homeshick.sh
-    yes | homeshick clone -b casonclagg/dotfiles-alien
-    yes | homeshick link dotfiles-alien
+    yes | homeshick clone -b casonclagg/dotfiles-hyperfast
+    yes | homeshick link dotfiles-hyperfast
   fi
 }
 
-function install_uiapps() {
-  install_apt_packages "i3 pavucontrol scrot xclip vim-gnome fonts-powerline"
+function install_obsidian() {
+  # Download latest Obsidian .deb package
+  echo "Downloading Obsidian..."
+  wget https://github.com/obsidianmd/obsidian-releases/releases/download/v1.7.7/obsidian_1.7.7_amd64.deb
 
-  # For the nvidia 3080, we need 470
-  if [[ $(ubuntu-drivers devices | grep -q nvidia-driver) -eq 0 ]]; then
-    if [[ $(dpkg -s nvidia-driver-470 &> /dev/null) -ne 0 ]]; then
-      # sudo add-apt-repository -y ppa:graphics-drivers/ppa
-      # sudo apt update
-      # sudo apt install -y nvidia-driver-470
-      sudo apt-get remove --purge '^nvidia-.*'
-      echo 'nouveau' | sudo tee -a /etc/modules
-      sudo ubuntu-drivers install
-    fi
-  fi
+  # Install Obsidian
+  echo "Installing Obsidian..."
+  sudo apt install ./obsidian_1.7.7_amd64.deb
+
+  # Clean up downloaded .deb file
+  rm obsidian_1.6.3_amd64.deb
+
+  echo "Obsidian has been installed."  
+}
+
+function install_uiapps() {
+  install_apt_packages "i3 pavucontrol scrot xclip fonts-powerline"
+
+  # For the nvidia 4080 Super, we need 550 (cuda 12.4)
+  # if [[ $(ubuntu-drivers devices | grep -q nvidia-driver) -eq 0 ]]; then
+  #     if [[ $(dpkg -s nvidia-driver-550 &> /dev/null) -ne 0 ]]; then
+  #         # Remove any existing NVIDIA drivers
+  #         sudo apt-get remove --purge '^nvidia-.*'
+  #         # Add nouveau as fallback
+  #         echo 'nouveau' | sudo tee -a /etc/modules
+  #         # Install recommended driver
+  #         sudo ubuntu-drivers install
+  #     fi
+  # fi
 
   # google chrome
   if ! _has google-chrome; then
@@ -276,14 +229,13 @@ function install_uiapps() {
     echo "BROWSER=$(which google-chrome)" >> ~/.bash_local
   fi
 
-  # slack
-  if ! _has slack; then
-    sudo snap install slack --classic
-  fi
-
   # spotify
   if ! _has spotify; then
     sudo snap install spotify
+  fi
+
+  if ! _has postman; then
+    sudo snap install postman
   fi
 }
 
@@ -316,66 +268,11 @@ function install_vscode() {
 
 function install_docker() {
   echo "NOT INSTALLING DOCKER"
-  # if ! _has docker; then
-  #   sudo apt install -y docker.io
-
-  #   distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-  #   curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-  #   curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-
-  #   sudo apt update && sudo apt install -y nvidia-container-toolkit
-  #   sudo systemctl restart docker
-
-  #   # Setup docker group - https://docs.docker.com/engine/install/linux-postinstall/
-  #   sudo groupadd docker
-  #   sudo usermod -aG docker $USER
-  #   # su ${USER}
-  #   sudo systemctl restart docker
-
-  #   # install nvidia-docker2
-  #   distribution=ubuntu18.04 && \
-  #   curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -    && \ 
-  #   curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-  #   sudo apt-get update
-  #   sudo apt-get install -y nvidia-docker2
-  #   sudo systemctl restart docker
-    
-  #   sudo apt install -y nvidia-utils-470 nvidia-cuda-toolkit
-  # fi
-}
-
-function install_devtools() {
-  # grab httpie if we didnt install python
-  if [[ ! $PACKAGES = *"python"* ]]; then
-    install_apt_packages "httpie"
-  fi
-
-  # gcloud cli
-  if ! _has gcloud; then
-    export CLOUD_SDK_REPO="cloud-sdk-${DISTRIB_CODENAME}"
-    source /etc/lsb-release
-    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-    sudo apt install -y apt-transport-https ca-certificates gnupg
-    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-    sudo apt update && sudo apt install -y google-cloud-sdk
-  fi
-
-  # kubectl cli
-  if ! _has kubectl; then
-    curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-    chmod +x ./kubectl
-    sudo mv ./kubectl /usr/local/bin/kubectl
-
-    # kubectl shell autocompletion
-    echo "source <(kubectl completion bash)" >> ~/.bash_local
-    # the k alias
-    echo "alias k='kubectl'" >> ~/.bash_local
-  fi
 }
 
 
 function main() {
-  PACKAGES="node python dotfiles devtools"
+  PACKAGES="node python dotfiles"
   local -r OPTS=':hfm'
   while builtin getopts ${OPTS} opt "${@}"; do
 
@@ -390,7 +287,6 @@ function main() {
       m) # minimal
         PACKAGES=""
         ;;
-
 
       \?)
         echo ${opt} ${OPTIND} 'is an invalid option' >&2;
@@ -413,8 +309,8 @@ function main() {
       install_$pkg
     fi
   done
-
-  install_vim_plugins "${DEFAULT_VIM_PLUGINS}"
+  
+  install_obsidian
 
   exit 0
 }

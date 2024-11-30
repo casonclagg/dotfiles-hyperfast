@@ -261,7 +261,7 @@ bar {
 
 # lock the screen
 bindsym $mod+Ctrl+l "exec i3lock -c '#000000'"
-exec_always --no-startup-id xautolock -time 10 -locker 'i3lock -c $lockcolor'
+exec_always --no-startup-id xautolock -time 120 -locker 'i3lock -c $lockcolor'
 
 # window settings for specific applications
 assign [class="Spotify Premium"] $ws8
