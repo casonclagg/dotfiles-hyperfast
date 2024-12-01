@@ -15,8 +15,8 @@ bindsym XF86AudioPrev exec playerctl previous
 # configure monitors
 # How to find your monitors:
 # xrandr
-set $monitor_one eDP
-set $monitor_two HDMI-A-0
+set $monitor_one DP-2
+set $monitor_two DP-0
 
 # configure workspaces
 set $ws1 1
@@ -244,7 +244,7 @@ set $base0F #FF5370
 # Status Bar
 bar {
   position top
-  status_command i3blocks -c ~/.config/i3blocks/config
+  status_command i3blocks -c /home/ccc/.config/i3blocks/config
   colors {
       background $base00
       separator  $base03

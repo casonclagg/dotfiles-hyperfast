@@ -1,3 +1,4 @@
+cat > ~/.config/i3blocks/config << 'EOL'
 # Global properties
 separator_block_width=30
 markup=pango
@@ -25,3 +26,4 @@ interval=60
 [time]
 command=date '+%l:%M %p | %A, %B %e %Y  '
 interval=10
+EOL
