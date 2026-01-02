@@ -318,6 +318,31 @@ function main() {
 
 main "$@"
 
+# First, install the base tools
+sudo apt install barrier curl mpv v4l2loopback-dkms v4l-utils rclone virtualbox virtualbox-ext-pack qpdf btop nvidia-cuda-toolkit websocat flatpak gnome-software-plugin-flatpak texlive-extra-utils wireguard-tools postgresql-client -y
+
+# Add the flathub repo (if you haven't already)
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+# Install the up-to-date desktop apps
+flatpak install flathub org.blender.Blender
+flatpak install flathub cc.arduino.IDE2
+flatpak install flathub com.calibre_ebook.calibre
+
+
+# Open VPN
+# 1. Install prerequisites (curl and https transport)
+sudo apt install apt-transport-https curl -y
+
+# 2. Add the OpenVPN public key to your system so it trusts the download
+mkdir -p /etc/apt/keyrings
+curl -sSfL https://packages.openvpn.net/packages-repo.gpg | sudo tee /etc/apt/keyrings/openvpn.asc > /dev/null
+
+# 3. Add the correct repository for your specific Ubuntu version
+echo "deb [signed-by=/etc/apt/keyrings/openvpn.asc] https://packages.openvpn.net/openvpn3/debian $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/openvpn3.list
+sudo apt update
+sudo apt install openvpn3 -y
+
 echo "---------------------------------------------------"
 echo "All finished. You'll want to source your bashrc."
 echo "$ source ~/.bashrc"
