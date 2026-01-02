@@ -1,6 +1,10 @@
 #!/bin/bash
 os=`uname`
 
+if [ -f ~/.secrets ]; then
+    source ~/.secrets
+fi
+
 alias ls='ls --color=auto'
 alias noh='history -d $(history 1)'
 
@@ -34,6 +38,7 @@ fi
 ###############################################################################
 alias yt='yt-dlp'
 alias k='kubectl'
+alias cocaine='xset s off -dpms && xset s noblank'
 
 alias noh='history -d $(history 1)'
 
@@ -144,7 +149,7 @@ export HISTCONTROL=ignoreboth:erasedups
 shopt -s histappend
 
 # After each command, append to the history file and reread it
-export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a; history -c; history -r"
+# export PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a; history -c; history -r"
 
 # add something to gitignore
 function gi {
@@ -184,3 +189,109 @@ eval "$(pyenv init --path)"
 eval "$(pyenv virtualenv-init -)"
 
 BROWSER=/usr/bin/google-chrome
+
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="/home/ccc/.pyenv/shims:\
+/home/ccc/.pyenv/bin:\
+/home/ccc/.vscode/extensions/ms-python.python-2025.0.0-linux-x64/python_files/deactivate/bash:\
+/home/ccc/.local/bin:\
+/home/ccc/.go/bin:\
+/home/ccc/go/bin:\
+/home/ccc/bin:\
+/usr/local/sbin:\
+/usr/local/bin:\
+/usr/sbin:\
+/usr/bin:\
+/sbin:\
+/bin:\
+/usr/games:\
+/usr/local/games:\
+/snap/bin:\
+/home/ccc/.lmstudio/bin"
+
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+
+nvm use 22
+
+combinevids() {
+    echo "Preparing videos..."
+    mkdir -p tmp_seq && > list.txt
+    # Find files, sort alphabetically, process them
+    find . -maxdepth 1 -name "*.mp4" -print0 | sort -z | while IFS= read -r -d '' f; do
+        filename=$(basename -- "$f")
+        out="tmp_seq/${filename%.*}_norm.mp4"
+        echo -ne "Formatting: $filename\033[0K\r"
+        ffmpeg -nostdin -v error -i "$f" -vf "scale=1200:1200:force_original_aspect_ratio=decrease,pad=1200:1200:(ow-iw)/2:(oh-ih)/2,setsar=1" -an -c:v libx264 -pix_fmt yuv420p "$out"
+        echo "file '$PWD/$out'" >> list.txt
+    done
+    echo -e "\nStitching files..."
+    ffmpeg -v error -f concat -safe 0 -i list.txt -c copy combined_video.mp4
+    rm -rf tmp_seq list.txt
+    echo "Done! Output saved to: combined_video.mp4"
+}
+
+combinevids_random() {
+    echo "Preparing videos (Random Order)..."
+    mkdir -p tmp_rand && > list.txt
+    # Find files, SHUFFLE them, process them
+    find . -maxdepth 1 -name "*.mp4" -print0 | shuf -z | while IFS= read -r -d '' f; do
+        filename=$(basename -- "$f")
+        # Use a timestamp in the temp name to avoid collisions if filenames are identical in different runs
+        out="tmp_rand/$(date +%s%N).mp4"
+        echo -ne "Formatting: $filename\033[0K\r"
+        ffmpeg -nostdin -v error -i "$f" -vf "scale=1200:1200:force_original_aspect_ratio=decrease,pad=1200:1200:(ow-iw)/2:(oh-ih)/2,setsar=1" -an -c:v libx264 -pix_fmt yuv420p "$out"
+        echo "file '$PWD/$out'" >> list.txt
+    done
+    echo -e "\nStitching files..."
+    ffmpeg -v error -f concat -safe 0 -i list.txt -c copy combined_random.mp4
+    rm -rf tmp_rand list.txt
+    echo "Done! Output saved to: combined_random.mp4"
+}
+
+transcribe() {
+    local file="$1"
+    local model_size="${2:-medium}" # Default to medium (balanced)
+    local device="${3:-cpu}"        # Default to CPU (Safe Mode)
+
+    if [[ -z "$file" ]]; then
+        echo "Usage: transcribe <file> [model_size] [device]"
+        echo "Example: transcribe video.mp4 large-v3 cuda"
+        return 1
+    fi
+    
+    # Matches your UltraWhisper dependencies
+    uv run --with faster-whisper python -c "
+import sys, os
+from faster_whisper import WhisperModel
+
+file = sys.argv[1]
+model_size = sys.argv[2]
+device = sys.argv[3]
+compute_type = 'float16' if device == 'cuda' else 'int8'
+
+if not os.path.exists(file):
+    print(f'❌ Error: File {file} not found.')
+    sys.exit(1)
+
+print(f'🚀 Loading {model_size} on {device} ({compute_type})...')
+try:
+    model = WhisperModel(model_size, device=device, compute_type=compute_type)
+except Exception as e:
+    print(f'❌ Error loading model: {e}')
+    print('💡 If using CUDA, ensure cuDNN 9+ libraries are in LD_LIBRARY_PATH')
+    sys.exit(1)
+
+print(f'🎙️  Transcribing {file}...')
+segments, info = model.transcribe(file, beam_size=5)
+
+out_file = file + '.txt'
+with open(out_file, 'w', encoding='utf-8') as f:
+    for segment in segments:
+        line = f'[{segment.start:.2f}s -> {segment.end:.2f}s] {segment.text}'
+        print(line)
+        f.write(line + '\n')
+
+print(f'✅ Saved: {out_file}')
+" "$file" "$model_size" "$device"
+}

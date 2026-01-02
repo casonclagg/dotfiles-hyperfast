@@ -15,28 +15,29 @@ bindsym XF86AudioPrev exec playerctl previous
 # configure monitors
 # How to find your monitors:
 # xrandr
-set $monitor_one DP-2
-set $monitor_two DP-0
+set $monitor_one DP-0
+set $monitor_two DP-2
+exec_always --no-startup-id xrandr --output DP-0 --mode 2560x1440 --rate 144.01 --pos 0x0 --primary --output DP-2 --mode 2560x1440 --pos 2560x0
 
 # configure workspaces
-set $ws1 1
-set $ws2 2
-set $ws3 3
+set $ws1 "1.bg"
+set $ws2 "2.sm"
+set $ws3 "3.working"
 set $ws4 4
-set $ws5 5
+set $ws5 "5.games"
 set $ws6 6
 set $ws7 7
-set $ws8 8
+set $ws8 "8.spotify"
 set $ws9 9
 set $ws0 0:10
 
 # bind workspaces to monitors
 workspace $ws1 output $monitor_one
 workspace $ws2 output $monitor_one
-workspace $ws3 output $monitor_two
-workspace $ws4 output $monitor_two
-workspace $ws5 output $monitor_two
-workspace $ws6 output $monitor_two
+workspace $ws3 output $monitor_one
+workspace $ws4 output $monitor_one
+workspace $ws5 output $monitor_one
+workspace $ws6 output $monitor_one
 workspace $ws7 output $monitor_two
 workspace $ws8 output $monitor_two
 workspace $ws9 output $monitor_two
@@ -87,7 +88,7 @@ floating_modifier $mod
 # start a terminal
 bindsym $mod+Return exec i3-sensible-terminal
 bindsym $mod+backslash exec google-chrome
-bindsym $mod+bracketright exec nautilus
+bindsym $mod+bracketright exec nautilus ~/Downloads
 
 # kill focused window
 bindsym $mod+Shift+q kill
@@ -273,3 +274,7 @@ assign [class="Discord"] $ws9
 # for_window [class="Pavucontrol"] floating enable
 
 exec_always --no-startup-id numlockx on
+
+# 8 hour sleep
+exec --no-startup-id xset s 28800
+exec --no-startup-id xset dpms 28800 28800 28800

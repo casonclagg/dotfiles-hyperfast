@@ -149,8 +149,12 @@
   rex = remote rm
   rem = remote rename
 
+[init]
+  defaultBranch = main
+
 [push]
   default = current
+  autoSetupRemote = true
 
 [url "git@github.com:"]
   insteadof = github:
@@ -163,3 +167,6 @@
 [user]
 	name = Cason Clagg
 	email = casonclagg@gmail.com
+
+[includeIf "gitdir:**/projects/latent_*/"]
+    path = ~/.gitconfig_latent
