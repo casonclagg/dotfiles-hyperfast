@@ -295,3 +295,6 @@ with open(out_file, 'w', encoding='utf-8') as f:
 print(f'✅ Saved: {out_file}')
 " "$file" "$model_size" "$device"
 }
+
+alias pbcopy='xclip -selection clipboard'
+alias pbpaste='xclip -selection clipboard -o'
